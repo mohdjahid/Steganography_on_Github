@@ -5,6 +5,7 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.Random;
 
 class Steganography extends JFrame implements ActionListener
 {
@@ -31,7 +32,8 @@ class Steganography extends JFrame implements ActionListener
 		  Graphics2D graphics;
 		  WritableRaster raster;
 		  DataBufferByte buffer;		
-
+	int unsetcode[]={0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80};
+	int setcode[]={0xFE,0xFD,0xFB,0xF7,0xEF,0xDF,0xBF,0x7F};
 	/*---------Constructor-------------*/
 	Steganography()
 	{
@@ -96,7 +98,7 @@ class Steganography extends JFrame implements ActionListener
 	{
 		new Steganography();
 	}
-
+	static int c=0;
 	/*-----------------------------Encode---------------------*/
 	public void encode_text(byte[] img,byte[] msg,int start)
 	{
@@ -104,51 +106,90 @@ class Steganography extends JFrame implements ActionListener
 		  for(int i=32;i<40;i++)
 					System.out.print(img[i]);
             System.out.println();
-
+		
+         
          for(int i=0;i<msg.length;i++)
 			{
-
-			 for(int j=7;j>=0;j--,start++)
-		       {
-                    int b=msg[i];
-					b>>>=j;
-					b&=1;
-					img[start]=(byte)((img[start]&0xFE)|b);
-			   }
+				Random r=new Random();
+				byte rand=(byte)r.nextInt(7);
+				System.out.println("Rand :"+rand);
+				 for(int j=7;j>=0;j--,start++)
+			       {
+	                    byte b=rand; 
+						b&=unsetcode[j];
+						 b>>>=j;
+						img[start]=(byte)((img[start]&0xFE)|b); 
+				   }
+				  // System.out.println("Massage :"+msg[i]);
+				 for(int j=7;j>=0;j--,start++)
+			       {
+	                    byte b=msg[i]; 
+						b&=unsetcode[j];	
+						if(j>=rand)
+							b>>>=j-rand;
+						else
+							b<<=rand-j;
+						System.out.println("msg : "+(char)msg[i]);	 
+						img[start]=(byte)((img[start]&setcode[rand])|b);
+						System.out.println("With code: "+img[start]);	  
+				   }  
 			}
-
-			   System.out.println("After");
-			   for(int i=32;i<40;i++)
-					System.out.print(img[i]);
-					System.out.println();
-			
+			System.out.println(++c);
 	}
 
 	/*--------------DECODE PASSWORD------------------*/
 	public byte[] decode_password(byte[] img)
 	{
 		int len=0;
-		for(int i=0;i<32;i++)
+		for(int j=0,i=0;i<4;i++)
 		{
-            int bit=(img[i]&1);
-			System.out.print(bit);
-			bit<<=(31-i);
-			len|=bit;
+	        byte rand=0;
+	    	len=0;    
+	        for(int k=0;k<8;k++,j++)   
+	        { 
+	            byte bit=(byte)(img[j]&1);
+				//System.out.print(bit);
+				bit<<=(7-k);
+				rand|=bit;
+			}
+			//System.out.println(rand);
+
+			for(int k=0;k<8;k++,j++)   
+	        { 
+	            int bit=(byte)(img[j]&unsetcode[rand]);
+	            if(k>=rand)
+							bit<<=(7-k-rand);
+				else
+							bit>>>=-(7-k-rand);
+				len|=bit;
+			}
+
 		}
 		System.out.println("length :"+len);
-       byte msg[]=new byte[len];
-		for(int i=32,k=0;k<len;k++)
+       	byte msg[]=new byte[len];
+		for(int i=64,k=0;k<len;k++)
 		{
-			for(int j=7;j>=0;j--,i++)
-			{
-				msg[k]=(byte)((msg[k] << 1) | (img[i] & 1));
-				//result[b] = (byte)((result[b] << 1) | (image[offset] & 1));
+			byte rand=0;
+	        for(int j=0;j<8;i++,j++)   
+	        { 
+	            byte bit=(byte)(img[i]&1);
+				//System.out.print(bit);
+				bit<<=(7-j);
+				rand|=bit;
 			}
-			//System.out.println(msg[k]);
+
+			for(byte j=0;j<8;i++,j++)   
+	        { 
+	            byte bit=(byte)(img[i]&unsetcode[rand]);
+	            if((7-j-rand)>=0)
+							bit<<=7-j-rand;
+				else
+							bit>>=-(7-j-rand);
+				msg[k]|=bit;
+			}
+			System.out.println("msg : "+(char)msg[k]);
 		}
-
 		return (msg);
-
 	}
 
 	//---------------------------------------------- Method need to be alter
@@ -159,12 +200,12 @@ class Steganography extends JFrame implements ActionListener
 		for(int i=32+decodekey.length()*8;i<32+32+decodekey.length()*8;i++)
 		{
             int bit=(img[i]&1);
-			System.out.print(bit);
+			//System.out.print(bit);
 			bit<<=(31-i);
 			len|=bit;
 		}
-		System.out.println("length :"+len);
-       byte msg[]=new byte[len];
+		//System.out.println("length :"+len);
+        byte msg[]=new byte[len];
 		for(int i=32+32+decodekey.length()*8,k=0;k<len;k++)
 		{
 			for(int j=7;j>=0;j--,i++)
@@ -265,9 +306,9 @@ class Steganography extends JFrame implements ActionListener
 							
 
 		  encode_text(img,keylen,0); // Hiding key length
-		  encode_text(img,keyBytes,32);   // Hiding key
+		  encode_text(img,keyBytes,64);   // Hiding key
 
-		  encode_text(img,len,32+key.length()*8);   // From 32th byte its key after that our cipher length
+		  //encode_text(img,len,64+key.length()*8*2);   // From 32th byte its key after that our cipher length
 				//	after hiding the length of message
 							s=new String("  ");
 									for(int i=0;i<100;i++)
@@ -279,7 +320,7 @@ class Steganography extends JFrame implements ActionListener
 										}
 									btb.setText(s);
 				
-		 encode_text(img,msg,32+32+key.length()*8);  // After hiding cipher length which occupies 32 bytes then hide the cipher
+		  //encode_text(img,msg,64+key.length()*8*2+64);  // After hiding cipher length which occupies 32 bytes then hide the cipher
 				//	after hiding the message
 							s=new String("  ");
 									for(int i=0;i<100;i++)
@@ -328,7 +369,7 @@ class Steganography extends JFrame implements ActionListener
 
 	        img=buffer.getData();                
 
-	        /*---------------- Initializing Decode Frame ------------------*/
+	      //  ---------------- Initializing Decode Frame ------------------
 	        decode_password_frame=new JFrame("Enter Decrypt key");
 	        decode_password_textarea=new JTextArea(100,50);
 	        decode_password_textarea.setBounds(10,10,150,40);
@@ -341,7 +382,7 @@ class Steganography extends JFrame implements ActionListener
 	        decode_password_frame.setLayout(null);
 	        decode_password_frame.setVisible(true);
 		}
-
+			
 		if(e.getActionCommand().equals("exit"))
 		{
 			System.exit(0);
